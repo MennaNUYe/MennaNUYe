@@ -1,0 +1,66 @@
+<?php
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_FILES['csv']) && $_FILES['csv']['error'] === UPLOAD_ERR_OK) {
+        $fileTmpPath = $_FILES['csv']['tmp_name'];
+        $fileName = $_FILES['csv']['name'];
+        $fileNameCmps = explode(".", $fileName);
+        $fileExtension = strtolower(end($fileNameCmps));
+
+        // Check if file is a csv
+        if ($fileExtension == 'csv') {
+            // Open CSV file
+            if (($handle = fopen($fileTmpPath, "r")) !== FALSE) {
+                // Create a temporary file in the system's temp directory
+                $vcfFile = tmpfile();
+
+                // Skip the header row in the CSV file
+                fgetcsv($handle);
+
+                while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
+                    $firstName = $data[0];
+                    $lastName = $data[1];
+                    $phoneNumber = $data[2];
+
+                    // Write to vcf
+                    fwrite($vcfFile, "BEGIN:VCARD\n");
+                    fwrite($vcfFile, "VERSION:3.0\n");
+                    fwrite($vcfFile, "N:{$lastName};{$firstName};;;\n");
+                    fwrite($vcfFile, "FN:{$firstName} {$lastName}\n");
+                    fwrite($vcfFile, "TEL;TYPE=CELL:{$phoneNumber}\n");
+                    fwrite($vcfFile, "END:VCARD\n");
+                }
+
+                fclose($handle);
+
+                // Get the path of the temporary file
+                $vcfFilePath = stream_get_meta_data($vcfFile)['uri'];
+
+                // Set headers and output the file for download
+                header('Content-Description: File Transfer');
+                header('Content-Type: text/x-vcard');
+                header('Content-Disposition: attachment; filename="contacts.vcf"');
+                header('Expires: 0');
+                header('Cache-Control: must-revalidate');
+                header('Pragma: public');
+                header('Content-Length: ' . filesize($vcfFilePath));
+                flush(); // Flush system output buffer
+                readfile($vcfFilePath);
+                die();
+            }
+        } else {
+            echo "Please upload a CSV file.";
+        }
+    }
+}
+?>
+
+<!DOCTYPE html>
+<html>
+<body>
+<form action="" method="post" enctype="multipart/form-data">
+    Select CSV file to upload:
+    <input type="file" name="csv" id="csv">
+    <input type="submit" value="Upload CSV" name="submit">
+</form>
+</body>
+</html>
